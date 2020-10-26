@@ -1,3 +1,8 @@
+#pragma once
+
+/**
+ * Something usefull (defenetly not)
+ */
 #define pr(msg) (Serial.print(msg))
 #define prl(msg) (Serial.println(msg))
 
