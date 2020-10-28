@@ -8,10 +8,12 @@
 #include <iomanip>
 #include <string.h>
 #include <stdio.h>
+
+#include <MACAddresses.h>
 /**
  * "Set" to collect all target devices
  */
-class TargetsSet  
+class AddressSet  
 {
 private: 
 	uint8_t *targets;
@@ -24,9 +26,9 @@ public:
 	static const int DEVICE_WAS_REMOVED = 1;
 	static const int MAC_ADDRESS_STRING_LENGTH = 6*2+5;
 
-	TargetsSet();
-	TargetsSet(int initialCapacity);
-	~TargetsSet();
+	AddressSet();
+	AddressSet(int initialCapacity);
+	~AddressSet();
 
 	int find(uint8_t *addr);
 	void remove(uint8_t *addr);
@@ -40,4 +42,6 @@ public:
 	std::string toString();
 	void getAddrString(int pos, char * buff);
 	static void addrToString(uint8_t * addr, char * buff);
+	static bool isABeacon(uint8_t * addr);
+
 };

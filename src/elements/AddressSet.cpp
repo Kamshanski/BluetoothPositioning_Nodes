@@ -1,19 +1,19 @@
-#include "TargetsSet.h"  
+#include "AddressSet.h"  
 #include "utilities.h"
 #include "HardwareSerial.h"
 
-TargetsSet::TargetsSet() : TargetsSet::TargetsSet(10) {}
+AddressSet::AddressSet() : AddressSet::AddressSet(10) {}
 
-TargetsSet::TargetsSet(int initialCapacity) {
+AddressSet::AddressSet(int initialCapacity) {
     capacity = initialCapacity;
     targets = new uint8_t[ESP_BD_ADDR_LEN*capacity];
 }
 
-TargetsSet::~TargetsSet() {
+AddressSet::~AddressSet() {
     delete targets;
 }
 
-int TargetsSet::addOrRemove(uint8_t addr[ESP_BD_ADDR_LEN]) {
+int AddressSet::addOrRemove(uint8_t addr[ESP_BD_ADDR_LEN]) {
     int pos = find(addr);
     if (pos < 0) {
         add(addr);
@@ -24,7 +24,7 @@ int TargetsSet::addOrRemove(uint8_t addr[ESP_BD_ADDR_LEN]) {
     }
 }
 
-int TargetsSet::find(uint8_t *addr) {
+int AddressSet::find(uint8_t *addr) {
     int pos = 0;
     bool equal = true;
     for (int i = 0; i < size; i++) {
@@ -39,7 +39,7 @@ int TargetsSet::find(uint8_t *addr) {
     return -1;
 }
 
-void TargetsSet::add(uint8_t *addr) {
+void AddressSet::add(uint8_t *addr) {
     if (size == capacity) {
         capacity+=10;
         resize(capacity);
@@ -53,12 +53,12 @@ void TargetsSet::add(uint8_t *addr) {
 
 }
 
-void TargetsSet::remove(uint8_t *addr) {
+void AddressSet::remove(uint8_t *addr) {
     int pos = find(addr);
     remove(pos);
 }
 
-void TargetsSet::remove(int pos) {
+void AddressSet::remove(int pos) {
     int newPos = pos * ESP_BD_ADDR_LEN;
     int lastPos = size * ESP_BD_ADDR_LEN;
     for (int i = 0; i < ESP_BD_ADDR_LEN; i++) {
@@ -67,17 +67,17 @@ void TargetsSet::remove(int pos) {
     size--;
 }
 
-std::string TargetsSet::getAddress(int pos) {
+std::string AddressSet::getAddress(int pos) {
     char addr[MAC_ADDRESS_STRING_LENGTH];
     getAddrString(pos, addr);
     return std::string(addr);
 }
 
-int TargetsSet::getSize() {
+int AddressSet::getSize() {
     return size;
 }
 
-std::string TargetsSet::toString() {
+std::string AddressSet::toString() {
     std::stringstream stream;
     stream << "TargetsSet: {"                    << "\n  "
            << "Size: " << size                  << "\n  "
@@ -96,12 +96,12 @@ std::string TargetsSet::toString() {
     return stream.str();
 }
 
-void TargetsSet::getAddrString(int pos, char * buff) {
+void AddressSet::getAddrString(int pos, char * buff) {
     pos = pos * ESP_BD_ADDR_LEN;
-    TargetsSet::addrToString(targets + pos, buff);
+    AddressSet::addrToString(targets + pos, buff);
 }
 
-void TargetsSet::addrToString(uint8_t * addr, char * buff) {
+void AddressSet::addrToString(uint8_t * addr, char * buff) {
     std::stringstream stream;
     stream << std::setfill('0') << std::setw(2) << std::hex << (int) addr[0] << ':';
     stream << std::setfill('0') << std::setw(2) << std::hex << (int) addr[1] << ':';
@@ -115,7 +115,7 @@ void TargetsSet::addrToString(uint8_t * addr, char * buff) {
     }
 }
 
-void TargetsSet::resize(int newCapacity) {
+void AddressSet::resize(int newCapacity) {
     uint8_t * newTargetsArray = new uint8_t[newCapacity*ESP_BD_ADDR_LEN];
     int limit = (newCapacity > capacity ? capacity : newCapacity) * ESP_BD_ADDR_LEN;
     for (size_t i = 0; i < limit; i++) {
@@ -123,6 +123,17 @@ void TargetsSet::resize(int newCapacity) {
     }
     delete targets;
     targets = newTargetsArray;
+}
+
+bool AddressSet::isABeacon(uint8_t * addr) {
+    bool isBeacon = true;
+    BLEAddress address = BLEAddress(addr);
+    for (int i = 0; i < SLAVES_NUMBER; i++) {
+        if (SLAVES_ADDR[i]->equals(address)) {
+            return true;
+        }
+    }
+    return false;  
 }
 
 

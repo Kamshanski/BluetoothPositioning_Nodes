@@ -1,24 +1,18 @@
-#include <Net.h>
+#include <Node.h>
 
-Net::Net() {
-    BLEDevice::init("Main_node");               // 
-
+MainNode::MainNode(std::string nodeName) : BaseNode(nodeName) {
     server = BLEDevice::createServer();         //
     server->setCallbacks(this);                 // this class implements onConnect and onDisconnect
-
     adv = BLEDevice::getAdvertising();          // Get object to set advirtizing
     adv->setScanResponse(true);                 // 
     adv->setMinPreferred(0x06);                 // functions that help with iPhone connections issue
     adv->setMinPreferred(0x12);
-
     advData = new BLEAdvertisementData();       // New class must be created each time ('cause lib-creators are cunts)
     advData->setManufacturerData(MANUF_DATA);   // Manufacturer Data is where additional data can be advertized
     //MANUF_DATA.substr(0, MANUF_DATA.length())   
     //          .append(deviceNumToString());     // херня, переписать. сабстринг надо пихать в отдельную переменную и потом сувать в advData
     adv->setAdvertisementData(*advData);        //
-
-    targetsSet = new TargetsSet(10);
-
+    targetsSet = new AddressSet(10); 
     service = server->createService(MAIN_SERVICE_UUID);
     notificationCharacteristic = service->createCharacteristic(
         NEW_DEVICES_CHARACTERISTIC_UUID,
@@ -27,24 +21,29 @@ Net::Net() {
         BLECharacteristic::PROPERTY_INDICATE
     );
     notificationCharacteristic->addDescriptor(new BLE2902());
-    notificationCharacteristic->setValue(targetsSet->getAddress(targetsSet->getSize()));
-    notificationCharacteristic->notify();
+    std::string str = targetsSet->getAddress(targetsSet->getSize());
+    prl(str.c_str());
+    notificationCharacteristic->setValue(str);
+    //notificationCharacteristic->notify();     // Можно ставить только, если есть какие-либо подключённые клиенты.
     service->start();
-
     BLEDevice::startAdvertising();
 }
 
-void Net::publishUpdate(uint8_t *addr, const char * option) {
+void MainNode::publishUpdate(uint8_t *addr, const char * option) {
     std::string* msg = createMessageForSlaves(addr, option);
     notificationCharacteristic->setValue(*msg);
-    notificationCharacteristic->notify();
-    conntectToAllSlaves();
+    if (slavesConnected > 0) {
+        // Causes crash if no slaves connected to main
+        notificationCharacteristic->notify();
+    }
 }
 
-std::string* Net::createMessageForSlaves(uint8_t *addr, const char * option) {
+std::string* MainNode::createMessageForSlaves(uint8_t *addr, const char * option) {
     std::string *payload = new std::string(option);
-    char * buff = new char[TargetsSet::MAC_ADDRESS_STRING_LENGTH];
-    TargetsSet::addrToString(addr, buff);
+
+    char * buff = new char[AddressSet::MAC_ADDRESS_STRING_LENGTH];
+    AddressSet::addrToString(addr, buff);
+
     payload->append(")")
             .append(buff)
             .append(")");
@@ -52,51 +51,57 @@ std::string* Net::createMessageForSlaves(uint8_t *addr, const char * option) {
     return payload;
 }
 
-void Net::conntectToAllSlaves() {
-    for (int i = 0; i < SLAVES_NUMBER; i++) {
-        if (!server->connect(*(SLAVES_ADDR[i]))) {
-            Serial.print("\nCoonection FAILED with _");
-            Serial.print(i);
-            Serial.println("_th slave!!!");
-        }
-    }
-}
-
-void Net::onConnect(BLEServer* pServer, esp_ble_gatts_cb_param_t *param) {
+void MainNode::onConnect(BLEServer* pServer, esp_ble_gatts_cb_param_t *param) {
     connected = true;
 
+    // Save received data
     uint8_t * receivedAddr = new uint8_t[ESP_BD_ADDR_LEN];
     uint16_t receivedConnId = param->connect.conn_id;
     copyAddress(param->connect.remote_bda, receivedAddr);
 
-    // No reaction if slave is connected
-    if (isAnyOfSlaves(receivedAddr))
+    // No reaction if slave is connected. Just count it's number
+    if (isAnyOfSlaves(receivedAddr)) {
+        slavesConnected++;
         return;
-    
+    }
     pServer->disconnect(receivedConnId);
 
-    int devicePos = 0;
-    devicePos = targetsSet->find(receivedAddr);
+    int devicePos = targetsSet->find(receivedAddr);
     if (devicePos < 0) {
         // Device is new. It should be recorded to targetsSet and published to Slaves
         targetsSet->add(receivedAddr);
         publishUpdate(receivedAddr, ADD);
     } 
     else {
-        // Device is new. It should be excluded from targetsSet and its removal must be published to Slaves
+        // Device is already connected. It should be excluded from targetsSet and its removal must be published to Slaves
         targetsSet->remove(devicePos);
         publishUpdate(receivedAddr, REMOVE);
     }
-
+    Serial.print("Slaves connected: ");
+    Serial.println(slavesConnected);
+    std::string out = targetsSet->toString();
+    Serial.print(out.c_str());
     Serial.println("Device connected");         
 }
 
-void Net::onDisconnect(BLEServer* pServer) {
+//WARNING! This method was added to esp32 BLE library by ME, to handle MAC of disconnected device!
+void MainNode::onDisconnect(BLEServer* pServer, esp_ble_gatts_cb_param_t *param) {
+    if (AddressSet::isABeacon(param->disconnect.remote_bda)) {
+        slavesConnected--;
+        return;
+    }
+    Serial.print("Slaves connected: ");
+    Serial.println(slavesConnected);
+
+    // Save received data
+    uint8_t * receivedAddr = new uint8_t[ESP_BD_ADDR_LEN];
+    copyAddress(param->connect.remote_bda, receivedAddr);
+
     connected = false;
     Serial.println("Device DISconnected");
 }
 
-bool Net::isAnyOfSlaves(uint8_t * addr) {
+bool MainNode::isAnyOfSlaves(uint8_t * addr) {
     bool equals = true;
     for (int i = 0; i < SLAVES_NUMBER; i++) {
         esp_bd_addr_t *slave = SLAVES_ADDR[i]->getNative();
@@ -110,7 +115,7 @@ bool Net::isAnyOfSlaves(uint8_t * addr) {
     return false;
 }
 
-void Net::copyAddress(uint8_t * from, uint8_t * to) {
+void MainNode::copyAddress(uint8_t * from, uint8_t * to) {
     for (int i = 0; i < ESP_BD_ADDR_LEN; i++) {
         to[i] = from[i];
     }
