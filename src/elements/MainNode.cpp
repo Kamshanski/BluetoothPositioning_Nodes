@@ -52,16 +52,18 @@ std::string* MainNode::createMessageForSlaves(uint8_t *addr, const char * option
 }
 
 void MainNode::onConnect(BLEServer* pServer, esp_ble_gatts_cb_param_t *param) {
-    connected = true;
-
     // Save received data
+    Serial.print("Device tries to connect: ");  
     uint8_t * receivedAddr = new uint8_t[ESP_BD_ADDR_LEN];
     uint16_t receivedConnId = param->connect.conn_id;
     copyAddress(param->connect.remote_bda, receivedAddr);
 
+    BLEDevice::startAdvertising();  
+    
     // No reaction if slave is connected. Just count it's number
     if (isAnyOfSlaves(receivedAddr)) {
         slavesConnected++;
+        prl("Slave Connected!");
         return;
     }
     pServer->disconnect(receivedConnId);
@@ -81,42 +83,26 @@ void MainNode::onConnect(BLEServer* pServer, esp_ble_gatts_cb_param_t *param) {
     Serial.println(slavesConnected);
     std::string out = targetsSet->toString();
     Serial.print(out.c_str());
-    Serial.println("Device connected");         
+    Serial.println("Device connected");       
 }
 
 //WARNING! This method was added to esp32 BLE library by ME, to handle MAC of disconnected device!
 void MainNode::onDisconnect(BLEServer* pServer, esp_ble_gatts_cb_param_t *param) {
-    if (AddressSet::isABeacon(param->disconnect.remote_bda)) {
-        slavesConnected--;
-        return;
-    }
-    Serial.print("Slaves connected: ");
-    Serial.println(slavesConnected);
-
     // Save received data
     uint8_t * receivedAddr = new uint8_t[ESP_BD_ADDR_LEN];
     copyAddress(param->connect.remote_bda, receivedAddr);
+    
+    if (isAnyOfSlaves(param->disconnect.remote_bda)) {
+        slavesConnected--;
+        prl("Slave DISconnected!");
+        return;
+    }
 
-    connected = false;
+    Serial.print("Slaves connected: ");
+    Serial.println(slavesConnected);
+    
     Serial.println("Device DISconnected");
 }
 
-bool MainNode::isAnyOfSlaves(uint8_t * addr) {
-    bool equals = true;
-    for (int i = 0; i < SLAVES_NUMBER; i++) {
-        esp_bd_addr_t *slave = SLAVES_ADDR[i]->getNative();
-        for (int j = 0; (j < ESP_BD_ADDR_LEN) & (equals == true); j++) {
-            equals = (*slave)[j] == addr[j];
-        }
-        if (equals == true) {
-            return true;
-        }
-    }
-    return false;
-}
 
-void MainNode::copyAddress(uint8_t * from, uint8_t * to) {
-    for (int i = 0; i < ESP_BD_ADDR_LEN; i++) {
-        to[i] = from[i];
-    }
-}
+

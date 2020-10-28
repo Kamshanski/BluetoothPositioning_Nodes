@@ -125,15 +125,5 @@ void AddressSet::resize(int newCapacity) {
     targets = newTargetsArray;
 }
 
-bool AddressSet::isABeacon(uint8_t * addr) {
-    bool isBeacon = true;
-    BLEAddress address = BLEAddress(addr);
-    for (int i = 0; i < SLAVES_NUMBER; i++) {
-        if (SLAVES_ADDR[i]->equals(address)) {
-            return true;
-        }
-    }
-    return false;  
-}
 
 

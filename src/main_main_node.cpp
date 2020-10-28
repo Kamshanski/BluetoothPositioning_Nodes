@@ -1,17 +1,14 @@
 #include "Arduino.h"
 #include <Node.h>
 
-//TODO: устранить текующую ошибку работы,
-//  доделать отправку и сохранение на минорах
+//TODO: доделать отправку и сохранение на минорах
 
 // GLOBALS
-MainNode* net;
+MainNode* mainNode;
 
 void setup() {
     Serial.begin(115200);
-    prl("a1");
-    net = new MainNode();
-    prl("a2");
+    mainNode = new MainNode("slaveNode1");
     Serial.println("Device started");
 }
  
