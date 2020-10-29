@@ -1,6 +1,7 @@
 #include "AddressSet.h"  
 #include "utilities.h"
 #include "HardwareSerial.h"
+#include <MACAddresses.h>
 
 AddressSet::AddressSet() : AddressSet::AddressSet(10) {}
 
@@ -23,7 +24,9 @@ int AddressSet::addOrRemove(uint8_t addr[ESP_BD_ADDR_LEN]) {
         return DEVICE_WAS_REMOVED;
     }
 }
-
+/**
+ * Returns position of address in array it it's present. Otherwise returns -1
+*/
 int AddressSet::find(uint8_t *addr) {
     int pos = 0;
     bool equal = true;
@@ -96,25 +99,6 @@ std::string AddressSet::toString() {
     return stream.str();
 }
 
-void AddressSet::getAddrString(int pos, char * buff) {
-    pos = pos * ESP_BD_ADDR_LEN;
-    AddressSet::addrToString(targets + pos, buff);
-}
-
-void AddressSet::addrToString(uint8_t * addr, char * buff) {
-    std::stringstream stream;
-    stream << std::setfill('0') << std::setw(2) << std::hex << (int) addr[0] << ':';
-    stream << std::setfill('0') << std::setw(2) << std::hex << (int) addr[1] << ':';
-    stream << std::setfill('0') << std::setw(2) << std::hex << (int) addr[2] << ':';
-    stream << std::setfill('0') << std::setw(2) << std::hex << (int) addr[3] << ':';
-    stream << std::setfill('0') << std::setw(2) << std::hex << (int) addr[4] << ':';
-    stream << std::setfill('0') << std::setw(2) << std::hex << (int) addr[5];
-    std::string str = stream.str();
-    for (int i = 0; i < MAC_ADDRESS_STRING_LENGTH; i++) {
-        buff[i] = str[i];
-    }
-}
-
 void AddressSet::resize(int newCapacity) {
     uint8_t * newTargetsArray = new uint8_t[newCapacity*ESP_BD_ADDR_LEN];
     int limit = (newCapacity > capacity ? capacity : newCapacity) * ESP_BD_ADDR_LEN;
@@ -123,6 +107,11 @@ void AddressSet::resize(int newCapacity) {
     }
     delete targets;
     targets = newTargetsArray;
+}
+
+void AddressSet::getAddrString(int pos, char * buff) {
+    pos = pos * ESP_BD_ADDR_LEN;
+    addrToString(targets + pos, buff);
 }
 
 

@@ -24,7 +24,6 @@ private:
 public: 
 	static const int NEW_DEVICE_WAS_ADDED = 0;
 	static const int DEVICE_WAS_REMOVED = 1;
-	static const int MAC_ADDRESS_STRING_LENGTH = 6*2+5;
 
 	AddressSet();
 	AddressSet(int initialCapacity);
@@ -41,7 +40,5 @@ public:
 
 	std::string toString();
 	void getAddrString(int pos, char * buff);
-	static void addrToString(uint8_t * addr, char * buff);
-	static bool isABeacon(uint8_t * addr);
 
 };

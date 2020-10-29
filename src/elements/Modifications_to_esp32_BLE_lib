@@ -27,4 +27,16 @@ void BLERemoteCharacteristic::setCallback(BLERemoteCharacteristicCallback* pCall
 	m_callback = pCallbacks;
 }
 
+to BLERemoteCharacteristic::gattClientEventHandler case ESP_GATTC_NOTIFY_EVT:
+m_callback->onNotify(this, evtParam);
+
+4) (No use of this addition as it's possible to pass 0 to ->start(0) to use scanner forever!)
+to BLEScan.cpp, to handleGAPEvent(), to case ESP_GAP_SEARCH_INQ_CMPL_EVT, before break; :
+if (m_pAdvertisedDeviceCallbacks != nullptr) {
+	m_pAdvertisedDeviceCallbacks->onScanStoped(this);
+}
+
+to BLEAdvertisedDevice.h, to BLEAdvertisedDeviceCallbacks class:
+virtual void onScanStoped(BLEScan* scanner) = 0;
+
 

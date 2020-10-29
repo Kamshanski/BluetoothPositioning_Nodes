@@ -4,6 +4,7 @@
 #include <BLEUtils.h>
 #include <BLEServer.h>
 #include <BLEClient.h>
+#include <BLEScan.h>
 
 #include <BLE2902.h>
 #include <HardwareSerial.h>
@@ -13,20 +14,26 @@
 
 #define MAIN_SERVICE_UUID "c33d30da-0cad-40e6-94f6-097c504e6ee2"
 #define NEW_DEVICES_CHARACTERISTIC_UUID "25338aa2-79be-4164-aaa3-f35011f93d7b"
+#define SCANNING_PERIOD_SEC 3
 
-
-class BaseNode {
+class BaseNode : public BLEAdvertisedDeviceCallbacks {
 protected:
+    BLEScan* scanner;
     AddressSet *targetsSet;
     int devicesNum = 0;                 // Number of connected devices
-    
-public:
-    BaseNode(std::string nodeName) {    // Пусть тут будет
-        BLEDevice::init(nodeName);                  // 
-    }
-    ~BaseNode() {}
+    bool scanning = false;
 
+public:
+    BaseNode(std::string nodeName);
+    ~BaseNode() {}
+    
+    void scan(int duration);
+    bool isScanning() { return scanning; }
+
+    void onResult(BLEAdvertisedDevice advertisedDevice);
+	void onScanStoped(BLEScan* scanner);
 };
+
 /**
  * Main class to operatre with BLE connections and device collection
  */
@@ -53,18 +60,17 @@ public:
 static const std::string MANUF_DATA = "__devices:";
 static const char * const ADD = "N";
 static const char * const REMOVE = "D";
+static const char * const NO_DATA = "0";
 
 class SlaveNode : public BaseNode, public BLEClientCallbacks, public BLERemoteCharacteristicCallback{
 private:
     BLEClient *client;
     BLERemoteService* serviceOfMainNode = nullptr;
     BLERemoteCharacteristic* notificationCharacteristic = nullptr;
-    int devicesNum = 0;                 // Number of connected devices
-    bool connected = false;             // Flag (no use. If many  devices connects simultaniously then change {deviceAddress} to array)
-
+    
     bool connectToMainNode();
     
-	public:
+public:
     SlaveNode(std::string nodeName);
     ~SlaveNode() {}
 
@@ -72,14 +78,9 @@ private:
     void onNotify(BLERemoteCharacteristic *remoteCharacteristic, esp_ble_gattc_cb_param_t *evtParam);
     void onConnect(BLEClient* pClient, esp_ble_gatts_cb_param_t *param);
     void onDisconnect(BLEClient *pClient, esp_ble_gatts_cb_param_t *param);
-
-    void deviceCollectionCallback(BLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify);
 };
 
 // Used to fill registerForNotify() method of BLERemoteCharacteristic. Otherwise no notifications will appear
-static void nullFunction(BLERemoteCharacteristic* pBLERemoteCharacteristic, 
-                         uint8_t* pData, size_t length, bool isNotify) { }
-
-
+static void nullFunction(BLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) { }
 
 

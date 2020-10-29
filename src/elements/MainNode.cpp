@@ -27,6 +27,8 @@ MainNode::MainNode(std::string nodeName) : BaseNode(nodeName) {
     //notificationCharacteristic->notify();     // Можно ставить только, если есть какие-либо подключённые клиенты.
     service->start();
     BLEDevice::startAdvertising();
+    
+    scan(0);
 }
 
 void MainNode::publishUpdate(uint8_t *addr, const char * option) {
@@ -36,17 +38,18 @@ void MainNode::publishUpdate(uint8_t *addr, const char * option) {
         // Causes crash if no slaves connected to main
         notificationCharacteristic->notify();
     }
+    delete msg;
 }
 
 std::string* MainNode::createMessageForSlaves(uint8_t *addr, const char * option) {
     std::string *payload = new std::string(option);
 
-    char * buff = new char[AddressSet::MAC_ADDRESS_STRING_LENGTH];
-    AddressSet::addrToString(addr, buff);
+    char * buff = new char[ESP_BD_ADDR_LEN];
+    for (int i = 0; i < ESP_BD_ADDR_LEN; i++) {
+        buff[i] = (char) addr[i];
+    }
 
-    payload->append(")")
-            .append(buff)
-            .append(")");
+    payload->append(buff);
 
     return payload;
 }
@@ -73,11 +76,13 @@ void MainNode::onConnect(BLEServer* pServer, esp_ble_gatts_cb_param_t *param) {
         // Device is new. It should be recorded to targetsSet and published to Slaves
         targetsSet->add(receivedAddr);
         publishUpdate(receivedAddr, ADD);
+        prl("Device ADD. Published to slaves...");
     } 
     else {
         // Device is already connected. It should be excluded from targetsSet and its removal must be published to Slaves
         targetsSet->remove(devicePos);
         publishUpdate(receivedAddr, REMOVE);
+        prl("Device REMOVE. Published to slaves...");
     }
     Serial.print("Slaves connected: ");
     Serial.println(slavesConnected);
@@ -103,6 +108,7 @@ void MainNode::onDisconnect(BLEServer* pServer, esp_ble_gatts_cb_param_t *param)
     
     Serial.println("Device DISconnected");
 }
+
 
 
 

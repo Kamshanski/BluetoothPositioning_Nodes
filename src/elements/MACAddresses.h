@@ -2,6 +2,8 @@
 #include <string>
 #include <BLEAddress.h>
 
+static const int MAC_ADDRESS_STRING_LENGTH = 6*2+5;
+
 // MAIN
 static BLEAddress* const MAIN_ADDR = new BLEAddress(std::string("B4:E6:2D:C1:E5:07"));
 
@@ -16,5 +18,7 @@ static BLEAddress* const SLAVES_ADDR[SLAVES_NUMBER] = {
 
 bool isAnyOfSlaves(uint8_t * addr);
 void copyAddress(uint8_t * from, uint8_t * to);
+
+void addrToString(uint8_t * addr, char * buff);
 // SERVER
 //  Добавить сервер, который будет всё подсчитывать

@@ -7,7 +7,9 @@ SlaveNode::SlaveNode(std::string nodeName) : BaseNode(nodeName) {
     connectToMainNode();                        // Connect to MainNode instantly
     prl("Connection to MainNode successfully established");
      
-    targetsSet = new AddressSet(10);            // Collection of devices  
+    targetsSet = new AddressSet(10);            // Collection of devices 
+    
+    scan(0); 
 }
 
 void SlaveNode::onConnect(BLEClient* pClient, esp_ble_gatts_cb_param_t *param) {
@@ -18,9 +20,33 @@ void SlaveNode::onDisconnect(BLEClient* pClient, esp_ble_gatts_cb_param_t *param
     prl("Somejne DISconnected!");
 }
 
-void SlaveNode::onNotify(BLERemoteCharacteristic *remoteCharacteristic, 
-                         esp_ble_gattc_cb_param_t *evtParam) {
-    Serial.println((char *)evtParam->notify.value);
+void SlaveNode::onNotify(BLERemoteCharacteristic *remoteCharacteristic, esp_ble_gattc_cb_param_t *evtParam) {
+    uint8_t receivedAddr[ESP_BD_ADDR_LEN];
+
+    int dataLen = evtParam->notify.value_len;
+    char receivedData[dataLen];
+    for (int i = 0; i < dataLen; i++) {
+        receivedData[i] = (char) evtParam->notify.value[i];
+    }
+    pr("Received Data: ");
+    prl(receivedData);
+    copyAddress(&(evtParam->notify.value[1]), receivedAddr);
+    char option = evtParam->notify.value[0];
+    char buff[MAC_ADDRESS_STRING_LENGTH];
+    addrToString(receivedAddr, buff);
+    pr(buff);
+    if (option == ADD[0]) {
+        targetsSet->add(receivedAddr);
+        prl(" added");
+    }
+    else if (option == REMOVE[0]) {
+        targetsSet->remove(receivedAddr);
+        prl(" removed");
+    } else if (option == NO_DATA[0]) {
+        prl(" - no data");
+    }
+    std::string report = targetsSet->toString();    
+    prl(report.c_str());
 }
 
 bool SlaveNode::connectToMainNode() {
