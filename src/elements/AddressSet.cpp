@@ -28,12 +28,11 @@ int AddressSet::addOrRemove(uint8_t addr[ESP_BD_ADDR_LEN]) {
  * Returns position of address in array it it's present. Otherwise returns -1
 */
 int AddressSet::find(uint8_t *addr) {
-    int pos = 0;
-    bool equal = true;
     for (int i = 0; i < size; i++) {
-        for (int j = 0; (j < ESP_BD_ADDR_LEN) & (equal == true); j++){
-            equal = targets[pos] == addr[j];
-            ++pos;
+        bool equal = true;
+        int addrIndex = ESP_BD_ADDR_LEN * i;
+        for (int j = 0; (j < ESP_BD_ADDR_LEN) & (equal == true); j++) {
+            equal = targets[addrIndex + j] == addr[j];
         }
         if (equal == true) {
             return i;
@@ -63,7 +62,7 @@ void AddressSet::remove(uint8_t *addr) {
 
 void AddressSet::remove(int pos) {
     int newPos = pos * ESP_BD_ADDR_LEN;
-    int lastPos = size * ESP_BD_ADDR_LEN;
+    int lastPos = (size - 1) * ESP_BD_ADDR_LEN;
     for (int i = 0; i < ESP_BD_ADDR_LEN; i++) {
         targets[newPos + i] = targets[lastPos + i];
     }

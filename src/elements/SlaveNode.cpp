@@ -1,21 +1,17 @@
 #include <Node.h>
 
-SlaveNode::SlaveNode(std::string nodeName) : BaseNode(nodeName) {
+SlaveNode::SlaveNode(std::string nodeName, uint8_t deviceId) : BaseNode(nodeName, deviceId) {
     client = BLEDevice::createClient();         //
     client->setClientCallbacks(this);           // this class implements onConnect and onDisconnect
-    
-    connectToMainNode();                        // Connect to MainNode instantly
+
     prl("Connection to MainNode successfully established");
-     
     targetsSet = new AddressSet(10);            // Collection of devices 
     
-    scan(0); 
 }
 
 void SlaveNode::onConnect(BLEClient* pClient, esp_ble_gatts_cb_param_t *param) {
     prl("Somejne Connected!");
 }
-
 void SlaveNode::onDisconnect(BLEClient* pClient, esp_ble_gatts_cb_param_t *param) {
     prl("Somejne DISconnected!");
 }
@@ -50,8 +46,9 @@ void SlaveNode::onNotify(BLERemoteCharacteristic *remoteCharacteristic, esp_ble_
 }
 
 bool SlaveNode::connectToMainNode() {
-    while (!client->connect(*MAIN_ADDR)) {
-        prl("Connecting to MainNode");
+    if (!client->connect(*MAIN_ADDR)) {
+        prl("Restarting slave because no connection was established");
+        abort();
     } 
     prl("Connected..."); 
 
@@ -63,16 +60,55 @@ bool SlaveNode::connectToMainNode() {
     prl("Service is found...");
 
     notificationCharacteristic = serviceOfMainNode->getCharacteristic(NEW_DEVICES_CHARACTERISTIC_UUID);
-
-    if (notificationCharacteristic == nullptr || notificationCharacteristic == nullptr) {
-        Serial.print("Failed to find our characteristic UUID");
+    if (notificationCharacteristic == nullptr) {
+        Serial.print("Failed to find notificationCharacteristic");
         return false;
     }
-    prl("Characteristic is found...");
-
+    prl("NotificationCharacteristic is found...");
     notificationCharacteristic->setCallback(this);
     notificationCharacteristic->registerForNotify(nullFunction);
-    prl("Callback is set...");
+    prl("NotificationCharacteristic Callback is set...");
+
+    rssiCollectCharacteristing = serviceOfMainNode->getCharacteristic(RSSI_COLLECT_CHARACTERISTIC_UUID);
+    if (rssiCollectCharacteristing == nullptr) {
+        Serial.print("Failed to find rssiCollectCharacteristing");
+        return false;
+    }
+    prl("RssiCollectCharacteristing is found...");
     
     return true;
+}
+
+void SlaveNode::syncTargetsSet() {
+    syncCharacteristic = serviceOfMainNode->getCharacteristic(SYNC_CHARACTERISTIC_UUID);
+    if (syncCharacteristic == nullptr) {
+        Serial.print("Failed to find Sync characteristic UUID");
+        return ;
+    }
+    prl("SyncCharacteristic is found...");
+    std::string syncData = syncCharacteristic->readValue();
+    Serial.println(syncData.c_str());
+    
+    /* Тут надо добаить парсинг сихро записи, 
+    но сначала поменять отправляемые сообщения на более компактные */
+
+    prl("Callback is set...");
+    
+}
+
+void SlaveNode::processNewMsg(uint8_t* msg) {
+    for (int i = 0; i < RSSI_MSG_LEN; i++) {
+        sendingBuffer[i] = msg[i];
+    }          
+    
+    hasRssiToSend = true;
+}
+
+bool SlaveNode::hasRssiDiscovered() {
+    return hasRssiToSend;
+}
+void SlaveNode::sendToMain() {
+    rssiCollectCharacteristing->writeValue(sendingBuffer, ESP_BD_ADDR_LEN+2, false);
+    hasRssiToSend = false;
+    prl("sent");
 }

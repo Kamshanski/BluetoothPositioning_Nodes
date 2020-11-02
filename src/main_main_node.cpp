@@ -1,15 +1,27 @@
 #include "Arduino.h"
 #include <Node.h>
 
-// Late TODO: сихнронизация SlaveNode относительно MainNode при подключении первого ко второму
+#if CONFIG_FREERTOS_UNICORE
+#define ARDUINO_RUNNING_CORE 0
+#else
+#define ARDUINO_RUNNING_CORE 1
+#endif
+
+#define KBite 1024
+
+// Почитать: http://www.blesstags.eu/2017/10/reading-notifying.html 
+
+// Late TODO: настройить отправку RSSI c учётом того, что скан блокирует полностью потоки. Либо останавливать скан, отправлять и возвращать скан. Либо сделать внутри отправку другим способом. Нотификацией
+
 
 //TODO: проверить неправильность поиска адреса сосканированного устройства в targetsSet
 
-// #define MAIN new MainNode("Main_node")
-#define SLAVE_1 new SlaveNode("Slave_node_1")
-// #define SLAVE_2 new SlaveNode("Slave_node_2")
-// #define SLAVE_3 new SlaveNode("Slave_node_3")
-// #define SLAVE_4 new SlaveNode("Slave_node_4")
+#define MAIN new MainNode("Main_node", 37)
+// #define SLAVE_1 new SlaveNode("Slave_node_1", 41)
+// #define SLAVE_2 new SlaveNode("Slave_node_2", 42)
+// #define SLAVE_3 new SlaveNode("Slave_node_3", 43)
+// #define SLAVE_4 new SlaveNode("Slave_node_4", 44)
+
 
 
 // GLOBALS
@@ -39,12 +51,67 @@ SlaveNode* node;
 #endif   
  }
 
-void setup() {
-    Serial.begin(115200);
-    Serial.println("Device started");
-    setNodeWithPreprocessor();
-    Serial.println("Device is on!");
+void TaskScan(void *pvParameters) {
+    (void) pvParameters;
+
+    Serial.println("init SCAN Task...");
+    node->initScanTool();
+    Serial.println("Scan started");
+    node->scan(0);
+    Serial.println("... SCAN Task init DONE.");
+    while (true) { }                                // Eternal task of scanning
 }
 
-void loop() {
+void TaskWrite(void *pvParameters)  {
+    (void) pvParameters;
+    setNodeWithPreprocessor();
+#ifndef MAIN
+    Serial.println("connecting");
+    node->connectToMainNode();                        // Connect to MainNode instantly
+    Serial.println("connected");
+    node->syncTargetsSet();                           // Synchronize collected data
+    Serial.println("synchronized");
+#endif
+
+    xTaskCreatePinnedToCore(
+        TaskScan, 
+        "TaskBlink",   // A name just for humans
+        KBite*2,  // This stack size can be checked & adjusted by reading the Stack Highwater
+        NULL,
+        2,  // Priority, with 3 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
+        NULL, 
+        ARDUINO_RUNNING_CORE
+    );
+
+    while (true) {
+        #ifndef MAIN
+        if (node->hasRssiDiscovered()) {  
+            node->sendToMain();
+        }
+        
+        #endif
+        vTaskDelay(30 / portTICK_RATE_MS);
+    }
 }
+
+
+void setup() {
+    Serial.begin(115200);
+
+    xTaskCreatePinnedToCore(
+        TaskWrite,
+        "AnalogReadA3",
+        KBite*10,  // Stack size
+        NULL,
+        2,  // Priority
+        NULL, 
+        ARDUINO_RUNNING_CORE
+    );
+    
+    Serial.println("Device started");
+}
+
+
+
+
+void loop() {}

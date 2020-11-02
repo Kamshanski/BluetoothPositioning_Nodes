@@ -1,34 +1,51 @@
 #include <Node.h>
 
-MainNode::MainNode(std::string nodeName) : BaseNode(nodeName) {
+MainNode::MainNode(std::string nodeName, uint8_t deviceId) : BaseNode(nodeName, deviceId) {
     server = BLEDevice::createServer();         //
-    server->setCallbacks(this);                 // this class implements onConnect and onDisconnect
+    server->setCallbacks(this);                 // MainNode class implements onConnect and onDisconnect
     adv = BLEDevice::getAdvertising();          // Get object to set advirtizing
     adv->setScanResponse(true);                 // 
     adv->setMinPreferred(0x06);                 // functions that help with iPhone connections issue
     adv->setMinPreferred(0x12);
     advData = new BLEAdvertisementData();       // New class must be created each time ('cause lib-creators are cunts)
     advData->setManufacturerData(MANUF_DATA);   // Manufacturer Data is where additional data can be advertized
-    //MANUF_DATA.substr(0, MANUF_DATA.length())   
-    //          .append(deviceNumToString());     // херня, переписать. сабстринг надо пихать в отдельную переменную и потом сувать в advData
     adv->setAdvertisementData(*advData);        //
-    targetsSet = new AddressSet(10); 
+
+    targetsSet = new AddressSet(10);
+    serverBuffer = new ServerBuffer(50); 
+
     service = server->createService(MAIN_SERVICE_UUID);
+
     notificationCharacteristic = service->createCharacteristic(
         NEW_DEVICES_CHARACTERISTIC_UUID,
         BLECharacteristic::PROPERTY_READ   |
-        BLECharacteristic::PROPERTY_NOTIFY |
-        BLECharacteristic::PROPERTY_INDICATE
+        BLECharacteristic::PROPERTY_INDICATE |
+        BLECharacteristic::PROPERTY_NOTIFY
     );
     notificationCharacteristic->addDescriptor(new BLE2902());
-    std::string str = targetsSet->getAddress(targetsSet->getSize());
-    prl(str.c_str());
-    notificationCharacteristic->setValue(str);
+    notificationCharacteristic->setValue("0");
+
+    syncCharacteristic = service->createCharacteristic(
+        SYNC_CHARACTERISTIC_UUID,
+        BLECharacteristic::PROPERTY_READ
+    );
+    syncCharacteristic->addDescriptor(new BLE2902());
+    syncCharacteristic->setValue("0");
+
+    rssiCollectCharacteristing = service->createCharacteristic(
+        RSSI_COLLECT_CHARACTERISTIC_UUID,
+        BLECharacteristic::PROPERTY_READ |
+        BLECharacteristic::PROPERTY_WRITE    |
+        BLECharacteristic::PROPERTY_INDICATE |
+        BLECharacteristic::PROPERTY_NOTIFY
+
+    );
+    rssiCollectCharacteristing->addDescriptor(new BLE2902());
+    rssiCollectCharacteristing->setCallbacks(this);             // MainNode class implements onConnect and onDisconnect
+
     //notificationCharacteristic->notify();     // Можно ставить только, если есть какие-либо подключённые клиенты.
     service->start();
     BLEDevice::startAdvertising();
-    
-    scan(0);
 }
 
 void MainNode::publishUpdate(uint8_t *addr, const char * option) {
@@ -38,6 +55,7 @@ void MainNode::publishUpdate(uint8_t *addr, const char * option) {
         // Causes crash if no slaves connected to main
         notificationCharacteristic->notify();
     }
+    setSyncData();
     delete msg;
 }
 
@@ -52,6 +70,11 @@ std::string* MainNode::createMessageForSlaves(uint8_t *addr, const char * option
     payload->append(buff);
 
     return payload;
+}
+
+void MainNode::setSyncData() {
+    /* Тут надо поменать это сообщение на более компактное */
+    syncCharacteristic->setValue(targetsSet->toString());
 }
 
 void MainNode::onConnect(BLEServer* pServer, esp_ble_gatts_cb_param_t *param) {
@@ -69,7 +92,8 @@ void MainNode::onConnect(BLEServer* pServer, esp_ble_gatts_cb_param_t *param) {
         prl("Slave Connected!");
         return;
     }
-    pServer->disconnect(receivedConnId);
+    pServer->disconnect(receivedConnId);     // No need to keep target devices connected
+
 
     int devicePos = targetsSet->find(receivedAddr);
     if (devicePos < 0) {
@@ -107,6 +131,52 @@ void MainNode::onDisconnect(BLEServer* pServer, esp_ble_gatts_cb_param_t *param)
     Serial.println(slavesConnected);
     
     Serial.println("Device DISconnected");
+}
+
+
+void MainNode::onWrite(BLECharacteristic* pCharacteristic) {
+    pr("ON_WRITE: ");
+
+    std::string payload = pCharacteristic->getValue();
+    uint8_t receivedMsg[RSSI_MSG_LEN];
+
+    for (int i = 0; i < RSSI_MSG_LEN; i++) {
+        receivedMsg[i] = payload[i];
+    }
+    
+    pushToServer(receivedMsg);
+
+    uint8_t receivedAddr[ESP_BD_ADDR_LEN]; 
+    copyAddress(receivedMsg, receivedAddr);
+
+    int rssi = ((int) receivedMsg[POS_RSSI]) - RSSI_TRANSMISSION_BIAS;
+
+    int receivedDeviceId = (int) receivedMsg[POS_DEVICE_ID];
+    Serial.print("Addr: ");
+    for (int i = 0; i < ESP_BD_ADDR_LEN; i++) {
+        pr(receivedAddr[i]);
+    }
+    // print
+    Serial.print(", RSSI: ");
+    Serial.print(rssi);
+    Serial.print(", By device: ");
+    Serial.print(receivedDeviceId);
+    Serial.print("Memory: ");
+    Serial.print(ESP.getFreeHeap());
+    Serial.print("SRAM: ");
+    Serial.println(ESP.getFreePsram());
+    //pushToServer(receivedAddr, rssi, receivedDeviceId);
+}
+
+void MainNode::processNewMsg(uint8_t* msg) {
+    pushToServer(msg);
+}
+
+void MainNode::pushToServer(uint8_t* msg) {
+    int bufferState = serverBuffer->put(msg);
+    if (bufferState <= 0) {
+        serverBuffer->send();    
+    }
 }
 
 
