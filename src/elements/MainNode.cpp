@@ -89,7 +89,8 @@ void MainNode::onConnect(BLEServer* pServer, esp_ble_gatts_cb_param_t *param) {
     // No reaction if slave is connected. Just count it's number
     if (isAnyOfSlaves(receivedAddr)) {
         slavesConnected++;
-        prl("Slave Connected!");
+        pr("Slave Connected: ");
+        prl(slavesConnected);
         return;
     }
     pServer->disconnect(receivedConnId);     // No need to keep target devices connected
@@ -108,6 +109,8 @@ void MainNode::onConnect(BLEServer* pServer, esp_ble_gatts_cb_param_t *param) {
         publishUpdate(receivedAddr, REMOVE);
         prl("Device REMOVE. Published to slaves...");
     }
+
+    
     Serial.print("Slaves connected: ");
     Serial.println(slavesConnected);
     std::string out = targetsSet->toString();
@@ -123,16 +126,16 @@ void MainNode::onDisconnect(BLEServer* pServer, esp_ble_gatts_cb_param_t *param)
     
     if (isAnyOfSlaves(param->disconnect.remote_bda)) {
         slavesConnected--;
-        prl("Slave DISconnected!");
+        pr("Slave DISconnected: ");
+        prl(slavesConnected);
         return;
     }
 
     Serial.print("Slaves connected: ");
-    Serial.println(slavesConnected);
+    
     
     Serial.println("Device DISconnected");
 }
-
 
 void MainNode::onWrite(BLECharacteristic* pCharacteristic) {
     pr("ON_WRITE: ");
@@ -169,16 +172,31 @@ void MainNode::onWrite(BLECharacteristic* pCharacteristic) {
 }
 
 void MainNode::processNewMsg(uint8_t* msg) {
+    vTaskDelay(15);
     pushToServer(msg);
 }
 
 void MainNode::pushToServer(uint8_t* msg) {
-    int bufferState = serverBuffer->put(msg);
-    if (bufferState <= 0) {
-        serverBuffer->send();    
-    }
+    if( xSemaphore != NULL ) {
+        /* See if we can obtain the semaphore.  If the semaphore is not
+        available wait 10 ticks to see if it becomes free. */
+        if( xSemaphoreTake( xSemaphore, 0 ) == pdTRUE ) {
+            int bufferState = serverBuffer->put(msg);
+            if (bufferState <= 0) {
+                serverBuffer->send();    
+            }
+            xSemaphoreGive( xSemaphore );
+        } else {
+            prl("else");
+        }
+        return;
+    } 
+    else {
+        prl("semafore null");
+    }    
 }
 
 
-
-
+void MainNode::onConnect(BLEServer* pServer) {}
+//WARNING! This method was added to esp32 BLE library by ME, to handle MAC of disconnected device!
+void MainNode::onDisconnect(BLEServer* pServer) {}

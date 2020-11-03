@@ -39,4 +39,7 @@ if (m_pAdvertisedDeviceCallbacks != nullptr) {
 to BLEAdvertisedDevice.h, to BLEAdvertisedDeviceCallbacks class:
 virtual void onScanStoped(BLEScan* scanner) = 0;
 
+5) to esp32-hal-bt.c, to btStart(), after esp_bt_controller_config_t cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT(); :
+cfg.ble_max_conn = 8;
+
 

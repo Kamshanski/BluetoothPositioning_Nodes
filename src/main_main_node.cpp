@@ -28,9 +28,7 @@
 #ifdef MAIN
 MainNode* node;
 #else
-#if defined(SLAVE_1) || defined(SLAVE_2) || defined(SLAVE_3) || defined(SLAVE_4)
 SlaveNode* node;
-#endif
 #endif
 
  void setNodeWithPreprocessor() {
@@ -56,32 +54,31 @@ void TaskScan(void *pvParameters) {
 
     Serial.println("init SCAN Task...");
     node->initScanTool();
-    Serial.println("Scan started");
     node->scan(0);
     Serial.println("... SCAN Task init DONE.");
-    while (true) { }                                // Eternal task of scanning
+
+    while (true) {              // Eternal task of scanning
+        // if (node->targetsSet->getSize() < 1 && node->isScanning()) {
+        //     node->scanStop();
+        // }
+        // else if (node->targetsSet->getSize() > 0 && !node->isScanning()) {
+        //     Serial.println("Scan started");
+        //     node->scan(0);
+        // }
+        // vTaskDelay(10 / portTICK_RATE_MS);
+    }                             
 }
 
 void TaskWrite(void *pvParameters)  {
     (void) pvParameters;
-    setNodeWithPreprocessor();
 #ifndef MAIN
+    node->xSemaphore = xSemaphoreCreateMutex();
     Serial.println("connecting");
     node->connectToMainNode();                        // Connect to MainNode instantly
     Serial.println("connected");
     node->syncTargetsSet();                           // Synchronize collected data
     Serial.println("synchronized");
 #endif
-
-    xTaskCreatePinnedToCore(
-        TaskScan, 
-        "TaskBlink",   // A name just for humans
-        KBite*2,  // This stack size can be checked & adjusted by reading the Stack Highwater
-        NULL,
-        2,  // Priority, with 3 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
-        NULL, 
-        ARDUINO_RUNNING_CORE
-    );
 
     while (true) {
         #ifndef MAIN
@@ -97,6 +94,9 @@ void TaskWrite(void *pvParameters)  {
 
 void setup() {
     Serial.begin(115200);
+    
+    setNodeWithPreprocessor();
+    prl("device inited");
 
     xTaskCreatePinnedToCore(
         TaskWrite,
@@ -107,11 +107,22 @@ void setup() {
         NULL, 
         ARDUINO_RUNNING_CORE
     );
+
+    delay(350);
+
+    xTaskCreatePinnedToCore(
+        TaskScan, 
+        "TaskBlink",   // A name just for humans
+        KBite*3,  // This stack size can be checked & adjusted by reading the Stack Highwater
+        NULL,
+        1,  // Priority, with 3 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
+        NULL, 
+        ARDUINO_RUNNING_CORE
+    );
     
     Serial.println("Device started");
 }
 
 
-
-
-void loop() {}
+void loop() {
+}

@@ -28,21 +28,18 @@ void SlaveNode::onNotify(BLERemoteCharacteristic *remoteCharacteristic, esp_ble_
     prl(receivedData);
     copyAddress(&(evtParam->notify.value[1]), receivedAddr);
     char option = evtParam->notify.value[0];
-    char buff[MAC_ADDRESS_STRING_LENGTH];
-    addrToString(receivedAddr, buff);
-    pr(buff);
     if (option == ADD[0]) {
         targetsSet->add(receivedAddr);
-        prl(" added");
     }
     else if (option == REMOVE[0]) {
         targetsSet->remove(receivedAddr);
-        prl(" removed");
     } else if (option == NO_DATA[0]) {
         prl(" - no data");
     }
-    std::string report = targetsSet->toString();    
-    prl(report.c_str());
+    
+    char buff[MAC_ADDRESS_STRING_LENGTH];
+    addrToString(receivedAddr, buff);
+    pr(buff);
 }
 
 bool SlaveNode::connectToMainNode() {

@@ -4,13 +4,17 @@
  *          0 if buff became full after put()
  *          1 if buff isn't full
  */
-
 int ServerBuffer::put(uint8_t *msg) {
+    if (timeStart == 0UL) {
+        timeStart = millis();
+        stream  << "{TS:" << timeStart << ",payload:[";
+    }
+
     if (size < maxMsgs) {
-        int pos = size * RSSI_MSG_LEN;
         for (int i = 0; i < RSSI_MSG_LEN; i++) {
-            buffer[pos] = msg[i];
-            pos++;
+            char first = HEX_LETTERS[msg[i] & FIRST];
+            char second = HEX_LETTERS[(msg[i] & SECOND) >> 4];
+            stream << std::setfill('0') << std::setw(2) << std::hex << (int) msg[i];
         }
         size++;
         
@@ -22,18 +26,13 @@ int ServerBuffer::put(uint8_t *msg) {
 }
 
 void ServerBuffer::send() {
-    std::string metadata("T");
+    stream << "],timeE:" << millis() << ",}";
+    Serial.println(stream.str().c_str());
+    clear();
+}
 
-    int sizeOfTimeBuff = 8 * sizeof(unsigned long);
-    char buf[sizeOfTimeBuff + 1];
-    ultoa(millis(), buf, 10);
-    
-    metadata.append(buf, sizeOfTimeBuff)
-            .append(".");
-    
-    Serial.print("MSG_STARTS");
-    Serial.print(metadata.c_str());
-    Serial.print(buffer.c_str());
-    Serial.print("END_OF_MSG");
+void ServerBuffer::clear() {
     size = 0;
+    timeStart = 0UL;
+    stream.clear();    
 }

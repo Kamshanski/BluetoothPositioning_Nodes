@@ -25,11 +25,12 @@ class BaseNode : public BLEAdvertisedDeviceCallbacks {
 protected:
     uint8_t deviceId;
     BLEScan* scanner;
-    AddressSet *targetsSet;
     int devicesNum = 0;                 // Number of connected devices
     bool scanning = false;
 
 public:
+    AddressSet *targetsSet;
+
     BaseNode(std::string nodeName, uint8_t deviceId);
     ~BaseNode() {}
     
@@ -69,8 +70,12 @@ private:
 	void onWrite(BLECharacteristic* pCharacteristic);
     void onConnect(BLEServer* pServer, esp_ble_gatts_cb_param_t *param);
     void onDisconnect(BLEServer* pServer, esp_ble_gatts_cb_param_t *param);
+    void onConnect(BLEServer* pServer);
+    void onDisconnect(BLEServer* pServer);
 public:
-    ~MainNode() {}
+    ~MainNode() { }
+    SemaphoreHandle_t xSemaphore = NULL;
+    
     MainNode(std::string nodeName, uint8_t deviceId);
 };
 static const std::string MANUF_DATA = "__devices:";
