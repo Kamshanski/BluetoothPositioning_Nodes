@@ -114,7 +114,7 @@ void MainNode::onConnect(BLEServer* pServer, esp_ble_gatts_cb_param_t *param) {
     Serial.print("Slaves connected: ");
     Serial.println(slavesConnected);
     std::string out = targetsSet->toString();
-    Serial.print(out.c_str());
+    Serial.println(out.c_str());
     Serial.println("Device connected");       
 }
 
@@ -130,70 +130,73 @@ void MainNode::onDisconnect(BLEServer* pServer, esp_ble_gatts_cb_param_t *param)
         prl(slavesConnected);
         return;
     }
-
-    Serial.print("Slaves connected: ");
-    
     
     Serial.println("Device DISconnected");
 }
 
 void MainNode::onWrite(BLECharacteristic* pCharacteristic) {
-    pr("ON_WRITE: ");
-
     std::string payload = pCharacteristic->getValue();
-    uint8_t receivedMsg[RSSI_MSG_LEN];
+    char receivedMsg[MSG_LEN];
 
-    for (int i = 0; i < RSSI_MSG_LEN; i++) {
+    for (int i = 0; i < MSG_LEN; i++) {
         receivedMsg[i] = payload[i];
     }
     
     pushToServer(receivedMsg);
+    
+    // // Print
+    // char receivedAddr[MAC_LEN_IN_MSG];
+    // for (int i = 0; i < MAC_LEN_IN_MSG; i++) {
+    //     receivedAddr[i] = receivedMsg[i];
+    // }
 
-    uint8_t receivedAddr[ESP_BD_ADDR_LEN]; 
-    copyAddress(receivedMsg, receivedAddr);
+    // char rssi[RSSI_LEN_IN_MSG];
+    // int r, r1, r2, rs = 0;
+    // for (int i = 0; i < RSSI_LEN_IN_MSG; i++) {
+    //     rssi[i] = receivedMsg[MAC_LEN_IN_MSG + i];
+    // }
 
-    int rssi = ((int) receivedMsg[POS_RSSI]) - RSSI_TRANSMISSION_BIAS;
+    // if ((receivedMsg[MAC_LEN_IN_MSG+1] >= '0') && (receivedMsg[MAC_LEN_IN_MSG+1] <= '9')) {
+    //     r1 = (receivedMsg[MAC_LEN_IN_MSG+1] - '0');
+    // } else {
+    //     r1 = (receivedMsg[MAC_LEN_IN_MSG+1] - 'a');
+    // }
 
-    int receivedDeviceId = (int) receivedMsg[POS_DEVICE_ID];
-    Serial.print("Addr: ");
-    for (int i = 0; i < ESP_BD_ADDR_LEN; i++) {
-        pr(receivedAddr[i]);
-    }
-    // print
-    Serial.print(", RSSI: ");
-    Serial.print(rssi);
-    Serial.print(", By device: ");
-    Serial.print(receivedDeviceId);
-    Serial.print("Memory: ");
-    Serial.print(ESP.getFreeHeap());
-    Serial.print("SRAM: ");
-    Serial.println(ESP.getFreePsram());
+    // if ((receivedMsg[MAC_LEN_IN_MSG+2] >= '0') && (receivedMsg[MAC_LEN_IN_MSG+2] <= '9')) {
+    //     r2 = receivedMsg[MAC_LEN_IN_MSG+2] - '0';
+    // } else {
+    //     r2 = receivedMsg[MAC_LEN_IN_MSG+2] - 'a';
+    // }
+    // r = (r1 << 4) + r2;
+    // rs = receivedMsg[MAC_LEN_IN_MSG] == '-' ? -r : r;
+
+    // char devId[ID_LEN_IN_MSG];
+    // for (int i = 0; i < ID_LEN_IN_MSG; i++) {
+    //     rssi[i] = receivedMsg[MAC_LEN_IN_MSG + RSSI_LEN_IN_MSG + i];
+    // }
+
+    // int receivedDeviceId = (int) receivedMsg[POS_DEVICE_ID];
+    // Serial.print("ON_WRITE: Addr: ");
+    // Serial.write((const uint8_t *)receivedAddr, MAC_LEN_IN_MSG);
+    // // print
+    // Serial.print(", RSSI: ");
+    // Serial.print(rs);
+    // Serial.print(", By device: ");
+    // Serial.print(receivedDeviceId);
     //pushToServer(receivedAddr, rssi, receivedDeviceId);
 }
 
-void MainNode::processNewMsg(uint8_t* msg) {
-    vTaskDelay(15);
+void MainNode::processNewMsg(char* msg) {
+    prl();
     pushToServer(msg);
 }
 
-void MainNode::pushToServer(uint8_t* msg) {
-    if( xSemaphore != NULL ) {
-        /* See if we can obtain the semaphore.  If the semaphore is not
-        available wait 10 ticks to see if it becomes free. */
-        if( xSemaphoreTake( xSemaphore, 0 ) == pdTRUE ) {
-            int bufferState = serverBuffer->put(msg);
-            if (bufferState <= 0) {
-                serverBuffer->send();    
-            }
-            xSemaphoreGive( xSemaphore );
-        } else {
-            prl("else");
-        }
-        return;
-    } 
-    else {
-        prl("semafore null");
-    }    
+void MainNode::pushToServer(char* msg) {
+    int bufferState = serverBuffer->put(msg);
+    if (bufferState <= 0) {
+        if (serverBuffer->getSize() > 49)
+            serverBuffer->send();    
+    }   
 }
 
 

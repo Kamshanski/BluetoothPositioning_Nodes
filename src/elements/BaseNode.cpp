@@ -32,19 +32,38 @@ void BaseNode::scanStop() {
 }
 
 void BaseNode::onResult(BLEAdvertisedDevice advertisedDevice) {
-    uint8_t msg[ESP_BD_ADDR_LEN + 2];
+    char msg[12+3+2];    // Hex of MAC (12), sign of RSSI (1), HEX of RSSI (2), HEX of deviceId
     esp_bd_addr_t* addr = advertisedDevice.getAddress().getNative();
-    copyAddress(*addr, msg);
+       
 
-    int devicePos = targetsSet->find(msg);
+    int devicePos = targetsSet->find(*addr);
     if (devicePos >= 0) {
-        uint8_t rssi = ((uint8_t) -advertisedDevice.getRSSI());       // To insert rssi in 8 bits (one char)
+        // MAC address
+        
+        for (int i = 0; i < ESP_BD_ADDR_LEN; i++) {
+            uint8_t ad = (*addr)[i];
+            int msgIndex = i << 1;
 
-        msg[ESP_BD_ADDR_LEN ] = rssi;
-        msg[ESP_BD_ADDR_LEN + 1] = deviceId;
+            uint8_t i1 = (ad >> 4) & 0b00001111;
+            uint8_t i2 = (ad) & 0b00001111;
+
+            msg[msgIndex]       = HEX_NUM[i1];
+            msg[msgIndex + 1]   = HEX_NUM[i2];
+        }
+        
+        // RSSI with sign
+        int rssi = advertisedDevice.getRSSI();
+        msg[12] = (rssi < 0) ? '-' : '0';       // Set minus sign or zero
+        rssi = rssi < 0 ? -rssi : rssi;         // Get absolute val of rssi
+        msg[13] = HEX_NUM[(rssi >> 4) & 0b00001111];
+        msg[14] = HEX_NUM[rssi & 0b00001111];
+
+        // Device ID
+        msg[15] = HEX_NUM[(deviceId >> 4) & 0b00001111];
+        msg[16] = HEX_NUM[deviceId & 0b00001111];
+        //Serial.println(msg);
         
         processNewMsg(msg);         // Slaves send rssi to Main. Main sends data to server
-        
     }
 }
 

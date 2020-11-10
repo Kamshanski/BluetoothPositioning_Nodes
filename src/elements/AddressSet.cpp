@@ -81,20 +81,18 @@ int AddressSet::getSize() {
 
 std::string AddressSet::toString() {
     std::stringstream stream;
-    stream << "TargetsSet: {"                    << "\n  "
-           << "Size: " << size                  << "\n  "
-           << "Capacity: " << capacity          << "\n  "
-           << "Devices: "                      << "\n";
+    stream << "Targets{"
+           << "\nSize" << size
+           << "\nCapacity" << capacity
+           << "\nDeviceMAC";
     for (int i = 0; i < size; i++) {
         char addr[MAC_ADDRESS_STRING_LENGTH];
         getAddrString(i, addr);
-        stream << "    ";
         for (int i = 0; i < MAC_ADDRESS_STRING_LENGTH; i++) { // This loop solve the problem of extra characters in the end of addr (e.g. 5c:ea:6a:1d:48:42␄MA?)
             stream << addr[i];
         }
-        stream << "\n";
     }
-    stream << "}";
+    stream << "\n}Targets";
     return stream.str();
 }
 

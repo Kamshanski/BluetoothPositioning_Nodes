@@ -21,6 +21,8 @@
 #define SYNC_CHARACTERISTIC_UUID "bc358e4b-972b-448a-a83c-ae784d68a037"
 #define RSSI_TRANSMISSION_BIAS 100
 
+static const char HEX_NUM[] = "0123456789abcdef";
+
 class BaseNode : public BLEAdvertisedDeviceCallbacks {
 protected:
     uint8_t deviceId;
@@ -41,7 +43,7 @@ public:
 
     void onResult(BLEAdvertisedDevice advertisedDevice);
 	void onScanStoped(BLEScan* scanner);
-    virtual void processNewMsg(uint8_t* msg) = 0;
+    virtual void processNewMsg(char* msg) = 0;
 };
 
 /**
@@ -64,8 +66,8 @@ private:
     void publishUpdate(uint8_t *addr, const char * option);
     std::string* createMessageForSlaves(uint8_t *addr, const char * option);
     void setSyncData();
-    void processNewMsg(uint8_t* msg);
-    void pushToServer(uint8_t* msg);
+    void processNewMsg(char* msg);
+    void pushToServer(char* msg);
 	// BLE Server Callbacks
 	void onWrite(BLECharacteristic* pCharacteristic);
     void onConnect(BLEServer* pServer, esp_ble_gatts_cb_param_t *param);
@@ -74,7 +76,6 @@ private:
     void onDisconnect(BLEServer* pServer);
 public:
     ~MainNode() { }
-    SemaphoreHandle_t xSemaphore = NULL;
     
     MainNode(std::string nodeName, uint8_t deviceId);
 };
@@ -94,7 +95,7 @@ private:
     bool hasRssiToSend = false;
     uint8_t sendingBuffer[ESP_BD_ADDR_LEN+2] = {0};
     
-    void processNewMsg(uint8_t* msg);
+    void processNewMsg(char* msg);
     
 public:
     SlaveNode(std::string nodeName, uint8_t deviceId);

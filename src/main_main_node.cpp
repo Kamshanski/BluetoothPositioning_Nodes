@@ -23,13 +23,13 @@
 // #define SLAVE_4 new SlaveNode("Slave_node_4", 44)
 
 
-
 // GLOBALS
 #ifdef MAIN
 MainNode* node;
 #else
 SlaveNode* node;
 #endif
+bool inited = false;
 
  void setNodeWithPreprocessor() {
 #ifdef MAIN
@@ -52,6 +52,10 @@ SlaveNode* node;
 void TaskScan(void *pvParameters) {
     (void) pvParameters;
 
+    while (!inited) {
+        vTaskDelay(5);
+    }
+
     Serial.println("init SCAN Task...");
     node->initScanTool();
     node->scan(0);
@@ -72,13 +76,13 @@ void TaskScan(void *pvParameters) {
 void TaskWrite(void *pvParameters)  {
     (void) pvParameters;
 #ifndef MAIN
-    node->xSemaphore = xSemaphoreCreateMutex();
     Serial.println("connecting");
     node->connectToMainNode();                        // Connect to MainNode instantly
     Serial.println("connected");
     node->syncTargetsSet();                           // Synchronize collected data
     Serial.println("synchronized");
 #endif
+    inited = true;
 
     while (true) {
         #ifndef MAIN
@@ -103,12 +107,10 @@ void setup() {
         "AnalogReadA3",
         KBite*10,  // Stack size
         NULL,
-        2,  // Priority
+        3,  // Priority
         NULL, 
         ARDUINO_RUNNING_CORE
-    );
-
-    delay(350);
+    );   
 
     xTaskCreatePinnedToCore(
         TaskScan, 

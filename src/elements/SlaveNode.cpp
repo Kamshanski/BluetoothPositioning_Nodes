@@ -93,8 +93,8 @@ void SlaveNode::syncTargetsSet() {
     
 }
 
-void SlaveNode::processNewMsg(uint8_t* msg) {
-    for (int i = 0; i < RSSI_MSG_LEN; i++) {
+void SlaveNode::processNewMsg(char* msg) {
+    for (int i = 0; i < MSG_LEN; i++) {
         sendingBuffer[i] = msg[i];
     }          
     
@@ -105,7 +105,7 @@ bool SlaveNode::hasRssiDiscovered() {
     return hasRssiToSend;
 }
 void SlaveNode::sendToMain() {
-    rssiCollectCharacteristing->writeValue(sendingBuffer, ESP_BD_ADDR_LEN+2, false);
+    rssiCollectCharacteristing->writeValue(sendingBuffer, MSG_LEN, false);
+    //prl("sent");
     hasRssiToSend = false;
-    prl("sent");
 }
